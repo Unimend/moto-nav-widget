@@ -3,36 +3,28 @@ package com.unimend.motonav;
 import android.content.Context;
 import android.graphics.*;
 import java.util.Locale;
+import java.util.HashSet;
 import org.json.*;
 
 final class NavRenderer {
     private static final int WHITE=Color.WHITE, GREY=Color.rgb(139,139,139), DARK=Color.rgb(36,36,36), RED=Color.rgb(235,48,54), GREEN=Color.rgb(65,191,111);
     private final Canvas c; private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG); private final float w,h,s;
-    private final Typeface doto,zpix,sans=Typeface.create("sans-serif",Typeface.BOLD); private final Context context;
-    private NavRenderer(Context context,Bitmap b) { this.context=context.getApplicationContext();c=new Canvas(b); w=b.getWidth();h=b.getHeight();s=h/360f;c.scale(s,s);doto=Typeface.createFromAsset(context.getAssets(),"doto.ttf");zpix=Typeface.createFromAsset(context.getAssets(),"zpix.ttf"); }
+    private final Typeface doto,zpix,sans=Typeface.create("sans-serif",Typeface.BOLD); private final Context context; private final double previewLat,previewLon;
+    private NavRenderer(Context context,Bitmap b,double previewLat,double previewLon) { this.context=context.getApplicationContext();this.previewLat=previewLat;this.previewLon=previewLon;c=new Canvas(b); w=b.getWidth();h=b.getHeight();s=h/360f;c.scale(s,s);doto=Typeface.createFromAsset(context.getAssets(),"doto.ttf");zpix=Typeface.createFromAsset(context.getAssets(),"zpix.ttf"); }
     static Bitmap render(Context context,int width,int height,NavStore store,int id,int frame) {
         Bitmap b=Bitmap.createBitmap(Math.max(480,width),Math.max(180,height),Bitmap.Config.ARGB_8888); b.setDensity(Bitmap.DENSITY_NONE);
-        new NavRenderer(context,b).draw(store,id,frame); return b;
+        new NavRenderer(context,b,Double.NaN,Double.NaN).draw(store,id,frame); return b;
     }
+    static Bitmap renderPreview(Context context,int width,int height,NavStore store,int id,double lat,double lon) {Bitmap b=Bitmap.createBitmap(Math.max(480,width),Math.max(180,height),Bitmap.Config.ARGB_8888);b.setDensity(Bitmap.DENSITY_NONE);new NavRenderer(context,b,lat,lon).draw(store,id,-1);return b;}
     private void draw(NavStore store,int id,int frame) {
-        if(store.live()){drawAmap(store,frame);return;}
-        int step=store.step(id);boolean running=store.running(id);
         float W=w/s;
         c.drawColor(Color.TRANSPARENT);
-        demoScene(W,frame,running);
-        String[] distance={"280 m","90 m","1.2 km","450 m"}; String[] road={"文一路","学院路","余杭塘路","古翠路"}; int[] speed={42,28,56,35};
-        arrow(120,174,step);
-        text(distance[step],322,105,76,WHITE,doto,Align.LEFT);
-        text(road[step],322,177,40,WHITE,zpix,Align.LEFT);
-        text("NEXT",72,49,28,RED,doto,Align.CENTER);
-        text(running?"DEMO · NAVIGATING":"DEMO · READY",322,226,25,running?GREEN:GREY,doto,Align.LEFT);
-        float speedX=W-116;
-        text(String.valueOf(speed[step]),speedX,116,78,WHITE,doto,Align.CENTER);
-        text("KM/H",speedX,174,27,GREY,doto,Align.CENTER);
-        text("18MIN · 12.4KM",speedX,230,23,GREY,doto,Align.CENTER);
-        progress(42,302,W-84,.64f+step*.07f);
-        text("64%",W-66,324,24,WHITE,doto,Align.RIGHT);
-        pageDots(W-31,frame,step);
+        Path mask=new Path();mask.addRoundRect(new RectF(0,0,W,360),16,16,Path.Direction.CW);c.clipPath(mask);
+        c.drawColor(Color.BLACK);
+        if(!realScene(W)){
+            text("OSM MAP",W/2,154,42,WHITE,doto,Align.CENTER);
+            text("点击载入当前位置",W/2,207,25,GREY,zpix,Align.CENTER);
+        }
     }
     private void drawAmap(NavStore store,int frame){
         float W=w/s;
@@ -49,12 +41,23 @@ final class NavRenderer {
         text("OSM SCENE",divider+12,57,21,GREY,doto,Align.LEFT);
         progress(42,315,W-84,.18f);pageDots(W-31,frame,0);
     }
-    private void realScene(float W){
-        SceneStore scene=new SceneStore(context);if(!scene.ready())return;JSONArray fs=scene.data().optJSONArray("features");if(fs==null)return;double lat0=scene.lat(),lon0=scene.lon(),cos=Math.cos(Math.toRadians(lat0));float left=Math.max(690,W*.61f),right=W-48,top=78,bottom=288,scale=Math.min((right-left)/500f,(bottom-top)/500f),cx=(left+right)/2f,cy=(top+bottom)/2f;
-        int save=c.save();c.clipRect(left,top,right,bottom);
-        for(int i=0;i<fs.length();i++){JSONObject f=fs.optJSONObject(i);JSONArray pts=f==null?null:f.optJSONArray("points");if(pts==null||pts.length()<2)continue;boolean building="building".equals(f.optString("kind"));Path path=new Path();for(int j=0;j<pts.length();j++){JSONArray q=pts.optJSONArray(j);if(q==null)continue;float x=cx+(float)((q.optDouble(1)-lon0)*111320*cos)*scale;float y=cy-(float)((q.optDouble(0)-lat0)*111320)*scale;if(j==0)path.moveTo(x,y);else path.lineTo(x,y);}if(building)path.close();p.setStyle(Paint.Style.STROKE);p.setStrokeJoin(building?Paint.Join.MITER:Paint.Join.ROUND);p.setStrokeCap(building?Paint.Cap.SQUARE:Paint.Cap.ROUND);p.setStrokeWidth(building?2.0f:(f.optBoolean("major")?5.0f:3.0f));p.setColor(building?Color.rgb(36,41,44):(f.optBoolean("major")?Color.rgb(64,69,73):Color.rgb(43,48,51)));c.drawPath(path,p);}
-        c.restoreToCount(save);
+    private boolean realScene(float W){
+        SceneStore scene=new SceneStore(context);if(!scene.ready())return false;JSONObject data=scene.data();JSONArray fs=data.optJSONArray("features");if(fs==null)return false;double actualLat=scene.lat(),actualLon=scene.lon(),lat0=Double.isNaN(previewLat)?actualLat:previewLat,lon0=Double.isNaN(previewLon)?actualLon:previewLon,cos=Math.cos(Math.toRadians(lat0));float inset=10,cx=W/2f,cy=180f,scale=Math.min(W-inset*2,360f-inset*2)/1040f;Path viewport=new Path();viewport.addRoundRect(new RectF(inset,inset,W-inset,360-inset),12,12,Path.Direction.CW);int viewportSave=c.save();c.clipPath(viewport);
+        for(int pass=0;pass<4;pass++)for(int i=0;i<fs.length();i++){JSONObject f=fs.optJSONObject(i);if(f==null)continue;String kind=f.optString("kind");int wanted="area".equals(kind)?0:("building".equals(kind)?1:("line".equals(kind)?2:3));if(wanted!=pass)continue;JSONArray pts=f.optJSONArray("points");if(pts==null||pts.length()<2)continue;Path path=path(pts,lat0,lon0,cos,cx,cy,scale);int cls=f.optInt("class");
+            if(pass==0){path.close();p.setStyle(Paint.Style.FILL);p.setColor(cls==0?Color.rgb(13,29,34):(cls<=3?Color.rgb(20,27,23):Color.rgb(24,25,26)));c.drawPath(path,p);}
+            else if(pass==1){path.close();p.setStyle(Paint.Style.FILL);p.setColor(Color.rgb(28,29,30));c.drawPath(path,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(.8f);p.setColor(Color.rgb(50,52,54));c.drawPath(path,p);}
+            else if(pass==2){p.setStyle(Paint.Style.STROKE);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);p.setStrokeWidth(cls==0?2.8f:1.4f);p.setColor(cls==0?Color.rgb(34,68,78):Color.rgb(74,74,74));c.drawPath(path,p);}
+            else {p.setStyle(Paint.Style.STROKE);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);float sw=cls==0?4.8f:(cls<=2?3.5f:(cls==3?2.3f:1.3f));p.setStrokeWidth(sw+2.0f);p.setColor(Color.rgb(8,9,10));c.drawPath(path,p);p.setStrokeWidth(sw);int roadColor=cls==0?Color.rgb(183,48,58):(cls==1?Color.rgb(205,199,168):(cls==2?Color.rgb(126,145,156):(cls==3?Color.rgb(103,106,109):Color.rgb(64,67,69))));p.setColor(roadColor);c.drawPath(path,p);}
+        }
+        drawRoute(lat0,lon0,cos,cx,cy,scale);
+        JSONArray labels=data.optJSONArray("labels");if(labels!=null){RectF[] used=new RectF[48];HashSet<String> names=new HashSet<>();int usedCount=0;for(int i=0;i<labels.length()&&usedCount<used.length;i++){JSONObject l=labels.optJSONObject(i);String name=l==null?"":l.optString("name");if(name.length()==0||name.length()>18||names.contains(name))continue;int cls=l.optInt("class",2);float size=cls==0?8.5f:9.2f;float x=cx+(float)((l.optDouble("lon")-lon0)*111320*cos)*scale,y=cy-(float)((l.optDouble("lat")-lat0)*111320)*scale;if(x<22||x>W-22||y<18||y>342)continue;String[] rows=labelRows(name);p.setTypeface(zpix);p.setTextSize(size);p.setAntiAlias(false);float widest=0;Rect b=new Rect();for(String row:rows){p.getTextBounds(row,0,row.length(),b);widest=Math.max(widest,b.width());}float total=rows.length==1?size:size*2.35f;RectF box=new RectF(x-widest/2f-3,y-total/2f-3,x+widest/2f+3,y+total/2f+3);if(box.left<14||box.right>W-14||box.top<14||box.bottom>346)continue;boolean overlap=false;for(int u=0;u<usedCount;u++)if(RectF.intersects(box,used[u])){overlap=true;break;}if(overlap)continue;names.add(name);used[usedCount++]=box;mapLabel(rows,x,y,size,cls==0?Color.rgb(220,220,220):Color.rgb(181,181,181));}}
+        float markerX=cx+(float)((actualLon-lon0)*111320*cos)*scale,markerY=cy-(float)((actualLat-lat0)*111320)*scale;if(markerX>inset&&markerX<W-inset&&markerY>inset&&markerY<360-inset){p.setStyle(Paint.Style.FILL);p.setColor(Color.argb(80,0,0,0));c.drawCircle(markerX,markerY,12,p);p.setColor(RED);c.drawCircle(markerX,markerY,6,p);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(2);p.setColor(WHITE);c.drawCircle(markerX,markerY,9,p);}
+        text("© OPENSTREETMAP",18,336,10,Color.rgb(132,132,132),doto,Align.LEFT);c.restoreToCount(viewportSave);return true;
     }
+    private Path path(JSONArray pts,double lat0,double lon0,double cos,float cx,float cy,float scale){Path path=new Path();for(int j=0;j<pts.length();j++){JSONArray q=pts.optJSONArray(j);if(q==null)continue;float x=cx+(float)((q.optDouble(1)-lon0)*111320*cos)*scale,y=cy-(float)((q.optDouble(0)-lat0)*111320)*scale;if(j==0)path.moveTo(x,y);else path.lineTo(x,y);}return path;}
+    private void drawRoute(double lat0,double lon0,double cos,float cx,float cy,float scale){JSONArray points=new RouteStore(context).route().optJSONArray("points");if(points==null||points.length()<2)return;Path route=path(points,lat0,lon0,cos,cx,cy,scale);p.setStyle(Paint.Style.STROKE);p.setStrokeJoin(Paint.Join.ROUND);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeWidth(8.5f);p.setColor(Color.rgb(4,5,6));c.drawPath(route,p);p.setStrokeWidth(5.2f);p.setColor(Color.WHITE);c.drawPath(route,p);}
+    private String[] labelRows(String value){if(value.length()<=7)return new String[]{value};int cut=(value.length()+1)/2;return new String[]{value.substring(0,cut),value.substring(cut)};}
+    private void mapLabel(String[] rows,float x,float y,float size,int color){p.setTypeface(zpix);p.setTextSize(size);p.setAntiAlias(false);float gap=size*1.25f,first=y-(rows.length-1)*gap/2f;for(int i=0;i<rows.length;i++){String value=rows[i];Rect r=new Rect();p.getTextBounds(value,0,value.length(),r);float tx=x-(r.left+r.right)/2f,base=first+i*gap-(r.top+r.bottom)/2f;p.setStyle(Paint.Style.STROKE);p.setStrokeJoin(Paint.Join.ROUND);p.setStrokeWidth(3.2f);p.setColor(Color.rgb(5,6,7));c.drawText(value,tx,base,p);p.setStyle(Paint.Style.FILL);p.setColor(color);c.drawText(value,tx,base,p);}p.setAntiAlias(true);}
     private String clean(String value){if(value==null)return "";value=value.replace(">>","").trim();return value.length()>18?value.substring(0,18):value;}
     private void demoScene(float W,int frame,boolean running) {
         p.setStyle(Paint.Style.STROKE);p.setStrokeJoin(Paint.Join.MITER);p.setStrokeWidth(2.2f);p.setColor(Color.rgb(36,41,44));

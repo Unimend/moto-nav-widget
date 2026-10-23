@@ -1,4 +1,8 @@
 build/
 *.keystore
 .DS_Store
+.tools/
+.map-source/
+maps/*.sqlite
+maps/*.sqlite-*
 

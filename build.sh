@@ -13,7 +13,7 @@ mkdir -p "$RUN/gen" "$RUN/classes" "$RUN/dex"
 export JAVA_HOME="$JDK_ROOT"
 export PATH="$JDK_ROOT/bin:$PATH"
 "$BT/aapt2" compile --dir "$PROJECT_DIR/res" -o "$RUN/res.zip"
-"$BT/aapt2" link -o "$RUN/base.apk" -I "$PLATFORM" --manifest "$PROJECT_DIR/AndroidManifest.xml" -R "$RUN/res.zip" --java "$RUN/gen" -A "$PROJECT_DIR/assets" --auto-add-overlay --min-sdk-version 24 --target-sdk-version 31 --version-code 5 --version-name 0.5.0
+"$BT/aapt2" link -o "$RUN/base.apk" -I "$PLATFORM" --manifest "$PROJECT_DIR/AndroidManifest.xml" -R "$RUN/res.zip" --java "$RUN/gen" -A "$PROJECT_DIR/assets" --auto-add-overlay --min-sdk-version 24 --target-sdk-version 31 --version-code 20 --version-name 0.9.1
 find "$PROJECT_DIR/src" "$RUN/gen" -name '*.java' -print0 | xargs -0 "$JDK_ROOT/bin/javac" -source 8 -target 8 -encoding UTF-8 -classpath "$PLATFORM" -d "$RUN/classes"
 find "$RUN/classes" -name '*.class' -print0 | xargs -0 "$BT/d8" --release --min-api 24 --lib "$PLATFORM" --output "$RUN/dex"
 cp "$RUN/base.apk" "$RUN/unsigned.apk"

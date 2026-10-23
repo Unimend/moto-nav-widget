@@ -1,6 +1,7 @@
 package com.unimend.motonav;
 
 import android.util.Xml;
+import android.content.Context;
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -8,7 +9,8 @@ import org.json.*;
 import org.xmlpull.v1.XmlPullParser;
 
 final class SceneSource {
-    static JSONObject fetch(double lat,double lon)throws Exception{
+    static JSONObject fetch(Context context,double lat,double lon)throws Exception{
+        JSONObject offline=OfflineSceneSource.fetch(context,lat,lon);if(offline!=null)return offline;
         double dy=0.00215,dx=dy/Math.max(0.25,Math.cos(Math.toRadians(lat)));
         String bbox=String.format(Locale.US,"%.6f,%.6f,%.6f,%.6f",lon-dx,lat-dy,lon+dx,lat+dy);
         HttpURLConnection c=(HttpURLConnection)new URL("https://api.openstreetmap.org/api/0.6/map?bbox="+bbox).openConnection();
