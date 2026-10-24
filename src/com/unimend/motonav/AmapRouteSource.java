@@ -6,10 +6,11 @@ import java.nio.charset.StandardCharsets;
 import org.json.*;
 
 final class AmapRouteSource {
-    static JSONObject fetch(String key,double originLat,double originLon,double destinationLat,double destinationLon)throws Exception{
+    static JSONObject fetch(String key,double originLat,double originLon,double destinationLat,double destinationLon,String mode)throws Exception{
         if(key==null||key.trim().length()<8)throw new IOException("请先填写高德 Web 服务 Key");
         double[] origin=Coordinates.wgsToGcj(originLat,originLon),destination=Coordinates.wgsToGcj(destinationLat,destinationLon);
-        String url="https://restapi.amap.com/v5/direction/driving?key="+URLEncoder.encode(key.trim(),"UTF-8")+"&origin="+fmt(origin[1])+","+fmt(origin[0])+"&destination="+fmt(destination[1])+","+fmt(destination[0])+"&strategy=32&show_fields=cost,polyline,navi";
+        String type="walking".equals(mode)?"walking":("bicycling".equals(mode)?"bicycling":"driving");
+        String url="https://restapi.amap.com/v5/direction/"+type+"?key="+URLEncoder.encode(key.trim(),"UTF-8")+"&origin="+fmt(origin[1])+","+fmt(origin[0])+"&destination="+fmt(destination[1])+","+fmt(destination[0])+("driving".equals(type)?"&strategy=32":"")+"&show_fields=cost,polyline,navi";
         HttpURLConnection connection=(HttpURLConnection)new URL(url).openConnection();connection.setConnectTimeout(8000);connection.setReadTimeout(15000);connection.setRequestProperty("User-Agent","Unimend-MotoNavWidget/0.8");
         int code=connection.getResponseCode();InputStream stream=code/100==2?connection.getInputStream():connection.getErrorStream();String body=read(stream);connection.disconnect();if(code/100!=2)throw new IOException("高德 HTTP "+code);
         JSONObject root=new JSONObject(body);if(!"1".equals(root.optString("status")))throw new IOException(root.optString("info","路线请求失败"));JSONArray paths=root.optJSONObject("route").optJSONArray("paths");if(paths==null||paths.length()==0)throw new IOException("没有可用路线");JSONObject path=paths.getJSONObject(0);JSONArray steps=path.optJSONArray("steps"),points=new JSONArray(),maneuvers=new JSONArray();
