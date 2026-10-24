@@ -3,10 +3,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <application android:label="MOTO 导航组件" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false">
         <service android:name=".NavNotificationService" android:label="MOTO NAV · 高德导航读取" android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" android:exported="true">
             <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
         </service>
+        <service android:name=".NavForegroundService" android:foregroundServiceType="location" android:exported="false" />
         <activity android:name=".NavActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
