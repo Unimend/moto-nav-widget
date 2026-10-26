@@ -21,5 +21,7 @@ final class NavSessionStore {
     String road(){return p.getString("road","");}
     String action(){return p.getString("action","");}
     boolean offRoute(){return p.getBoolean("off_route",false);}
+    boolean rerouting(){return p.getBoolean("rerouting",false);}
+    void rerouting(boolean value){p.edit().putBoolean("rerouting",value).apply();}
     long fixTime(){return p.getLong("fix_time",0);}
 }

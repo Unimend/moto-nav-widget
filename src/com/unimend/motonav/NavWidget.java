@@ -26,9 +26,9 @@ public class NavWidget extends AppWidgetProvider {
     }
     static void publish(Context c){for(int id:ids(c))draw(c,id,-1);}
     static void animate(Context c,int id){final Context app=c.getApplicationContext();final int token; synchronized(animations){token=animations.get(id,0)+1;animations.put(id,token);}Handler h=new Handler(Looper.getMainLooper());for(int i=0;i<8;i++){final int f=i;h.postDelayed(()->{synchronized(animations){if(animations.get(id)!=token)return;}draw(app,id,f);},i*150L);}h.postDelayed(()->{synchronized(animations){if(animations.get(id)!=token)return;animations.delete(id);}draw(app,id,-1);},1350L);}
-    @Override public void onUpdate(Context c,AppWidgetManager m,int[] ids){publish(c);}
+    @Override public void onUpdate(Context c,AppWidgetManager m,int[] ids){publish(c);MapTrackingService.start(c);}
     @Override public void onAppWidgetOptionsChanged(Context c,AppWidgetManager m,int id,Bundle options){draw(c,id,-1);}
-    @Override public void onDeleted(Context c,int[] ids){for(int id:ids)new NavStore(c).delete(id);}
-    @Override public void onReceive(Context c,Intent i){super.onReceive(c,i);if(NEXT.equals(i.getAction())){int id=i.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,-1);if(id<0)return;new NavStore(c).next(id);animate(c,id);}else if(Intent.ACTION_MY_PACKAGE_REPLACED.equals(i.getAction()))publish(c);}
+    @Override public void onDeleted(Context c,int[] ids){for(int id:ids)new NavStore(c).delete(id);if(ids(c).length==0)MapTrackingService.stop(c);}
+    @Override public void onReceive(Context c,Intent i){super.onReceive(c,i);if(NEXT.equals(i.getAction())){int id=i.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,-1);if(id<0)return;new NavStore(c).next(id);animate(c,id);}else if(Intent.ACTION_MY_PACKAGE_REPLACED.equals(i.getAction())){publish(c);MapTrackingService.start(c);}}
 }
 

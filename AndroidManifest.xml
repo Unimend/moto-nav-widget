@@ -9,6 +9,7 @@
             <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
         </service>
         <service android:name=".NavForegroundService" android:foregroundServiceType="location" android:exported="false" />
+        <service android:name=".MapTrackingService" android:foregroundServiceType="location" android:exported="false" />
         <activity android:name=".NavActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
